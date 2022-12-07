@@ -72,6 +72,25 @@
                 <target>8</target>
             </configuration>
         </plugin>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>3.2.0</version>
+            <configuration>
+                <includes>
+                    <include>**/*.properties</include>
+                    <include>**/*.class</include>
+                </includes>
+                <!-- Plugin-Classes: <comma separated list of fully qualified class names> -->
+                <archive>
+                    <addMavenDescriptor>false</addMavenDescriptor>
+                    <manifestEntries>
+                        <Plugin-Classes>com.cisco.josouthe.FilterRequestHandlerInterceptor,com.cisco.josouthe.McWorkspaceApiInterceptor</Plugin-Classes>
+                    </manifestEntries>
+                </archive>
+                <outputDirectory>${basedir}</outputDirectory>
+            </configuration>
+        </plugin>
     </plugins>
   </build>
 
