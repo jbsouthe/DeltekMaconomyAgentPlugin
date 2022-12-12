@@ -95,7 +95,7 @@ public class FilterRequestHandlerInterceptor extends MyBaseInterceptor {
     public List<Rule> initializeRules() {
         List<Rule> rules = new ArrayList<Rule>();
         rules.add(new Rule.Builder(
-                "com.maconomy.webservices.common.mcontext.McMaconomyContextFilter.FilterRequestHandler")
+                "com.maconomy.webservices.common.mcontext.McMaconomyContextFilter$FilterRequestHandler")
                 .classMatchType(SDKClassMatchType.MATCHES_CLASS)
                 .methodMatchString("handleRequest")
                 .methodStringMatchType( SDKStringMatchType.EQUALS)
