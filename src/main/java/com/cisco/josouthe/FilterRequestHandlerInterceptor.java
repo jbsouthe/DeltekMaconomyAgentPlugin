@@ -18,17 +18,20 @@ import java.util.List;
 
 public class FilterRequestHandlerInterceptor extends MyBaseInterceptor {
 
+    private IReflector getRequest;
     private IReflector getRequestId, getClientKey, getMethod, getURL, getQuery, getStatus;
     private IReflector getHeader;
 
     public FilterRequestHandlerInterceptor() {
         super();
 
+        getRequest = getNewReflectionBuilder().accessFieldValue("request", true).build();
+
         getRequestId = getNewReflectionBuilder().accessFieldValue("requestId", true).invokeInstanceMethod("toString", true).build(); //String
         getClientKey = getNewReflectionBuilder().accessFieldValue("clientKey", true).invokeInstanceMethod("asString", true).build(); //String
-        getMethod = getNewReflectionBuilder().accessFieldValue("request", true).invokeInstanceMethod("getMethod", true).build(); //String
-        getURL = getNewReflectionBuilder().accessFieldValue("request", true).invokeInstanceMethod("getRequestURL", true).invokeInstanceMethod("toString", true).build(); //String
-        getQuery = getNewReflectionBuilder().accessFieldValue("request", true).invokeInstanceMethod("getQueryString", true).build(); //String
+        getMethod = getNewReflectionBuilder().invokeInstanceMethod("getMethod", true).build(); //String
+        getURL = getNewReflectionBuilder().invokeInstanceMethod("getRequestURL", true).invokeInstanceMethod("toString", true).build(); //String
+        getQuery = getNewReflectionBuilder().invokeInstanceMethod("getQueryString", true).build(); //String
         getStatus = getNewReflectionBuilder().accessFieldValue("response", true).invokeInstanceMethod("getStatus", true).build(); //Integer
 
         getHeader = getNewReflectionBuilder().accessFieldValue("request", true).invokeInstanceMethod("getHeader", true, new String[]{ String.class.getCanonicalName()}).build(); //String
@@ -40,26 +43,35 @@ public class FilterRequestHandlerInterceptor extends MyBaseInterceptor {
 
         Transaction transaction = AppdynamicsAgent.getTransaction();
         if( transaction instanceof NoOpTransaction ) {
-            transaction = AppdynamicsAgent.startServletTransaction( buildServletContext(objectIntercepted), getCorrelationHeader(objectIntercepted), EntryTypes.HTTP, false);
+            Object request = getReflectiveObject( objectIntercepted, getRequest);
+            getLogger().debug("Got a request Object: "+ String.valueOf(request));
+            transaction = AppdynamicsAgent.startServletTransaction( buildServletContext(request), getCorrelationHeader(request), EntryTypes.HTTP, false);
+        } else {
+            getLogger().debug(String.format("BT is already configured for this servlet, guid: %s",transaction.getUniqueIdentifier()));
         }
-        transaction.collectData("RequestID", getReflectiveString(objectIntercepted, getRequestId, "UNKNOWN-ID"), snapshotDatascopeOnly );
-        transaction.collectData("Client", getReflectiveString(objectIntercepted, getClientKey, "UNKNOWN-CLIENT"), dataScopes );
+        String requestID = getReflectiveString(objectIntercepted, getRequestId, "UNKNOWN-ID");
+        String clientName = getReflectiveString(objectIntercepted, getClientKey, "UNKNOWN-CLIENT");
+        transaction.collectData("RequestID", requestID, snapshotDatascopeOnly );
+        transaction.collectData("Client", clientName , dataScopes );
+        getLogger().debug(String.format("Captured Custom Data, BT: '%s', RequestID: '%s', Client: '%s'", transaction.getUniqueIdentifier(), requestID, clientName));
         this.getLogger().debug("McWorkspaceApiInterceptor.onMethodBegin() finish: "+ className +"."+ methodName +"()");
 
         return transaction;
     }
 
-    private ServletContext buildServletContext(Object objectIntercepted) {
+    private ServletContext buildServletContext(Object request) {
         ServletContext.ServletContextBuilder builder = new ServletContext.ServletContextBuilder();
+        String url = getReflectiveString(request, getURL, "/unknown-url");
         try {
-            builder.withURL( getReflectiveString(objectIntercepted, getURL, "/unknown-url") );
+            builder.withURL( url );
         } catch (MalformedURLException e) {
             getLogger().info(String.format("Warning: URL exception: %s", e.getMessage()));
         }
 
-        builder.withRequestMethod( getReflectiveString(objectIntercepted,getMethod,"GET"));
+        String method = getReflectiveString(request,getMethod,"GET");
+        builder.withRequestMethod( method );
 
-        getLogger().debug(String.format("Need to figure out how to parse parameters: %s", getReflectiveString(objectIntercepted, getQuery, "UNKNOWN-QUERY")));
+        getLogger().debug(String.format("url: '%s' method: '%s' parameters: '%s'", url, method, getReflectiveString(request, getQuery, "UNKNOWN-QUERY")));
 
         return builder.build();
     }
@@ -67,7 +79,9 @@ public class FilterRequestHandlerInterceptor extends MyBaseInterceptor {
     private String getCorrelationHeader(Object request) {
         if( request == null ) return null;
         try {
-            return (String) getHeader.execute(request.getClass().getClassLoader(), request, new Object[]{ AppdynamicsAgent.TRANSACTION_CORRELATION_HEADER });
+            String correlationHeaderValue = (String) getHeader.execute(request.getClass().getClassLoader(), request, new Object[]{ AppdynamicsAgent.TRANSACTION_CORRELATION_HEADER });
+            getLogger().debug(String.format("Correlation Header Value: '%s'", correlationHeaderValue));
+            return correlationHeaderValue;
         } catch (ReflectorException e) {
             getLogger().info(String.format("Exception trying to read transaction correlation header: %s", e ));
         }
