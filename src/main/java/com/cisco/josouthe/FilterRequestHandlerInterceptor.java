@@ -13,14 +13,17 @@ import com.appdynamics.instrumentation.sdk.toolbox.reflection.ReflectorException
 
 import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 public class FilterRequestHandlerInterceptor extends MyBaseInterceptor {
 
     private IReflector getRequest;
     private IReflector getRequestId, getClientKey, getMethod, getURL, getQuery, getStatus;
-    private IReflector getHeader;
+    private IReflector getHeader, getHeaderNames;
 
     public FilterRequestHandlerInterceptor() {
         super();
@@ -34,7 +37,8 @@ public class FilterRequestHandlerInterceptor extends MyBaseInterceptor {
         getQuery = getNewReflectionBuilder().invokeInstanceMethod("getQueryString", true).build(); //String
         getStatus = getNewReflectionBuilder().accessFieldValue("response", true).invokeInstanceMethod("getStatus", true).build(); //Integer
 
-        getHeader = getNewReflectionBuilder().accessFieldValue("request", true).invokeInstanceMethod("getHeader", true, new String[]{ String.class.getCanonicalName()}).build(); //String
+        getHeader = getNewReflectionBuilder().invokeInstanceMethod("getHeader", true, new String[]{ String.class.getCanonicalName()}).build(); //String
+        getHeaderNames = getNewReflectionBuilder().invokeInstanceMethod( "getHeaderNames", true ).build(); //Enumeration<String>
     }
 
     @Override
@@ -71,19 +75,46 @@ public class FilterRequestHandlerInterceptor extends MyBaseInterceptor {
         String method = getReflectiveString(request,getMethod,"GET");
         builder.withRequestMethod( method );
 
-        getLogger().debug(String.format("url: '%s' method: '%s' parameters: '%s'", url, method, getReflectiveString(request, getQuery, "UNKNOWN-QUERY")));
+        Enumeration<String> headerNamesEnumeration = null;
+        try {
+            headerNamesEnumeration = (Enumeration<String>) getHeaderNames.execute(request.getClass().getClassLoader(), request);
+        } catch (ReflectorException e) {
+            getLogger().info(String.format("Warning: getHeaderNames reflection exception: %s", e.getMessage()));
+        }
+
+        Map<String,String> appdHeadersMap = new HashMap<>();
+        if( headerNamesEnumeration != null ) {
+            while( headerNamesEnumeration.hasMoreElements() ) {
+                String headerName = headerNamesEnumeration.nextElement();
+                String headerValue = getHeader(request,headerName);
+                if( headerValue != null ) appdHeadersMap.put(headerName,headerValue);
+            }
+            if( !appdHeadersMap.isEmpty() ) builder.withHeaders(appdHeadersMap);
+        }
+
+        getLogger().debug(String.format("url: '%s' method: '%s' headers: '%s'(%d) parameters: '%s'", url, method, appdHeadersMap, appdHeadersMap.size(), getReflectiveString(request, getQuery, "UNKNOWN-QUERY")));
 
         return builder.build();
     }
 
     private String getCorrelationHeader(Object request) {
         if( request == null ) return null;
+        String value = getHeader(request, AppdynamicsAgent.TRANSACTION_CORRELATION_HEADER);
+        if( "".equals(value) && value != null ) {
+            getLogger().debug("Correlation header value is not null but is equal to an empty string, this may be the issue we are looking for, returning null instead of an empty string");
+            return null;
+        }
+        return value;
+    }
+
+    private String getHeader(Object request, String headerName) {
+        if( request == null ) return null;
         try {
-            String correlationHeaderValue = (String) getHeader.execute(request.getClass().getClassLoader(), request, new Object[]{ AppdynamicsAgent.TRANSACTION_CORRELATION_HEADER });
-            getLogger().debug(String.format("Correlation Header Value: '%s'", correlationHeaderValue));
-            return correlationHeaderValue;
+            String headerValue = (String) getHeader.execute(request.getClass().getClassLoader(), request, new Object[]{ headerName });
+            getLogger().debug(String.format("Header Value: '%s':'%s'", headerName, headerValue));
+            return headerValue;
         } catch (ReflectorException e) {
-            getLogger().info(String.format("Exception trying to read transaction correlation header: %s", e ));
+            getLogger().info(String.format("Exception trying to read header: %s, Exception: %s",headerName, e ));
         }
         return null;
     }
