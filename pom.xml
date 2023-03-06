@@ -85,7 +85,8 @@
                 <archive>
                     <addMavenDescriptor>false</addMavenDescriptor>
                     <manifestEntries>
-                        <Plugin-Classes>com.cisco.josouthe.FilterRequestHandlerInterceptor,com.cisco.josouthe.McWorkspaceApiInterceptor, com.cisco.josouthe.McIOValueReaderInterceptor</Plugin-Classes>
+                        <Plugin-Classes>com.cisco.josouthe.FilterRequestHandlerInterceptor,com.cisco.josouthe.McWorkspaceApiInterceptor,
+                            com.cisco.josouthe.McRemoteFunctionInterceptor</Plugin-Classes>
                     </manifestEntries>
                 </archive>
                 <outputDirectory>${basedir}</outputDirectory>
