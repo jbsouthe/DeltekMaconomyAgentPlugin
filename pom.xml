@@ -3,7 +3,7 @@
   
   <groupId>com.cisco.josouthe</groupId>
   <artifactId>DeltekMaconomyAgentPlugin</artifactId>
-  <version>1.0</version>
+  <version>1.1</version>
   <!-- <packaging>jar</packaging>  -->
 
   <dependencies>
@@ -85,7 +85,7 @@
                 <archive>
                     <addMavenDescriptor>false</addMavenDescriptor>
                     <manifestEntries>
-                        <Plugin-Classes>com.cisco.josouthe.FilterRequestHandlerInterceptor,com.cisco.josouthe.McWorkspaceApiInterceptor</Plugin-Classes>
+                        <Plugin-Classes>com.cisco.josouthe.FilterRequestHandlerInterceptor,com.cisco.josouthe.McWorkspaceApiInterceptor, com.cisco.josouthe.McIOValueReaderInterceptor</Plugin-Classes>
                     </manifestEntries>
                 </archive>
                 <outputDirectory>${basedir}</outputDirectory>
